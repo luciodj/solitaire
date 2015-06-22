@@ -3,7 +3,8 @@
 #
 import pygame
 import sys
-from Model import *
+import Model as m
+from collections import namedtuple
 
 GREEN = ( 0, 128, 0)
 BLACK = ( 0, 0, 0)
@@ -15,30 +16,119 @@ LIGHTGRAY = ( 128, 128, 128)
 DARKGRAY  = ( 64, 64, 64)
 
 # parameterized display
+BRADIUS = 7
 pad = 8
 card_w = 100
 card_h = 145
 cardtop_h = 35
-backtop_h = 10
-XMax, YMax = 9*card_w, card_h*2 + backtop_h*6 + cardtop_h*12
+backtop_h = 35
 
-tops_space = 10
-tops_left = ( XMax-(4*card_w)-(4*tops_space))/2
-tops_y = 10
+XMax, YMax = 9*card_w, card_h*2 + backtop_h*6 + cardtop_h*12
+foundations_space = 20
+foundations_left = ( XMax-(4*card_w)-(4*foundations_space))/2
+foundations_y = 10
 rows_space = 5
 rows_left = 10
-rows_y = tops_y + card_h + 2*rows_space
-stack_x = XMax - card_w - tops_space
-stack_y = tops_y
-basket_x = stack_x
-basket_y = rows_y
+rows_y = foundations_y + card_h + 2*rows_space
+deck_x = XMax - card_w - foundations_space
+deck_y = foundations_y
+waste_x = deck_x
+waste_y = rows_y
 
 _screen = None
 _clock = None
 
-def printEmptyCard( x, y):
-    pygame.draw.rect( _screen, LIGHTGRAY, (x, y, card_w, card_h), 1)
+class Log( object):
+    def __init__( self):
+        self.list=[]
 
+    def append( self, actionTuple):
+        self.list.append( actionTuple)
+
+    def pop( self):
+        return self.list.pop()
+
+    def clear( self):
+        self.list = []
+
+log = Log()
+
+Rectangle = namedtuple('Rectangle', 'x y x1 y1')
+def contains( self, x, y):
+    return ( x > self.x) and ( x < self.x1) and ( y > self.y) and ( y < self.y1)
+Rectangle.contains = contains
+
+Touch = namedtuple( 'Touch', 'source index')
+
+class Button( object):
+    def __init__( self, img, rect):
+        self.img = img
+        self.rect = rect
+        
+def checkTouch( x, y):
+    'identify the object touched'
+    for i, foundation in enumerate( m.foundations):
+        if foundation.cards:
+            if foundation.top().rect.contains( x, y):
+                return Touch( source=foundation, index=-1)
+    # note the deck is always clickable (even when empty!)
+    if Rectangle(deck_x, deck_y, deck_x+card_w, deck_y+card_h).contains( x, y):
+        return Touch( source=m.deck, index=-1)
+    if m.waste.cards:
+        if m.waste.top().rect.contains( x, y):
+            return Touch( source=m.waste, index=-1)
+    for pile in m.piles:
+        if pile.cards:
+            for i, card in enumerate( pile.cards):
+                if card.rect.contains( x, y):
+                    return Touch( source=pile, index=i)  
+    for i, button in enumerate( buttons.cards):
+        if button.rect.contains( x, y):
+            return Touch( source=buttons, index=i)  
+    return None
+
+def touchWaste():
+    if m.waste.cards:
+        return Touch( source=m.waste, index=-1)
+
+def touchDeck():
+    return Touch( source=m.deck, index=-1)
+
+def touchButton( index):
+    return Touch( buttons, index)
+
+def touchPile( pile):
+    return Touch( pile, index=-1)
+
+class Animation( object):
+    first = 5           # default number of steps
+    speed = 40          # defautl animation speed
+
+    def __init__( self):
+        self.steps = 0          # animation steps counter
+        self.dest = []          # target list for card(s) at the end of animation
+        self.cards = []         # list of card(s) 'in motion'
+        self.currentXY = (0,0)  # animation current position
+
+    def set( self, dest, cards):
+        self.steps = self.first
+        self.dest = dest
+        self.cards = cards
+
+    def inMotion( self):
+        return (self.steps > 0)
+
+    def lastStep( self):
+        return (self.steps == 1)  
+
+    def sourceCoords( self):
+        return ( self.cards[0].rect.x, self.cards[0].rect.y)
+
+animation = Animation()
+
+def drawEmptyStack( stack, x, y):
+    pygame.draw.rect( _screen, LIGHTGRAY, (x, y, card_w, card_h), 2)
+    stack.xy = (x, y)
 
 def drawTopBevel( _color, left, top, w, h, r):
     right = left + w
@@ -56,250 +146,225 @@ def drawBottomBevel( _color, left, top, w, h, r):
     pygame.draw.rect  ( _screen, _color, (left, top, w, h-r), 0)
     pygame.draw.rect  ( _screen, _color, (left+r, top+h-r, w-r-r , r), 0)
 
-
-def printTopCard( c, x, y):
+def drawTopCard( card, x, y):
     # draw card white background
-    #pygame.draw.rect( _screen, WHITE, (x, y, card_w, cardtop_h), 0)
-    drawTopBevel( WHITE, x, y, card_w, cardtop_h, 4)
-
+    drawTopBevel( WHITE, x, y, card_w, cardtop_h, BRADIUS)
     # separator
     pygame.draw.line( _screen, LIGHTGRAY, ( x+4, y), ( x+card_w-4, y), 1)
-
-    # value
-    value = c.c if c.c != "X" else "10"
-    img = _font.render( value, 1, (BLACK,RED)[ c.isRed()])
+    # rank
+    value = card.rank if card.rank != "X" else "10"
+    img = _font.render( value, 1, (BLACK,RED)[ card.isRed()])
     _screen.blit( img, (x+pad, y+pad))
-
-    # Seed
-    sfc = SeedImages[ seedOrd( c.s)]
+    # suit
+    sfc = suitsImages[ m.suits.index( card.suit)]
     _screen.blit( sfc, ( x+card_w-sfc.get_height()-pad, y+pad))
+    #annotate card area
+    card.rect = Rectangle( x, y, x+card_w, y+cardtop_h)
 
-
-
-def printFullCard( c, x, y):
-    # print top
-    printTopCard( c, x, y)
-
-    # draw card white background
-    #pygame.draw.rect( _screen, WHITE, (x, y +cardtop_h, card_w, card_h-cardtop_h), 0)
+def drawFullCard( card, x, y):
+    # draw top
+    drawTopCard( card, x, y)
     # draw full size bevel
-    drawBottomBevel( WHITE, x, y+cardtop_h, card_w, card_h-cardtop_h, 4)
-
-
+    drawBottomBevel( WHITE, x, y+cardtop_h, card_w, card_h-cardtop_h, BRADIUS)
     # add the larger image
-    if cardOrd( c.c) <= cardOrd( "X"):
-        # print a big seed
-        sfc = SeedImages[ seedOrd( c.s)+4]
+    if m.ranks.index( card.rank) <= m.ranks.index( "X"):
+        # draw a big seed
+        sfc = bigSuitsImages[ m.suits.index( card.suit)]
     else:
-       # print the figure
-        sfc = FigureImages[ ( cardOrd( c.c)-cardOrd( "J"))*4 + seedOrd( c.s)]
-
+       # draw the figure
+        sfc = figureImages[ ( m.ranks.index( card.rank) 
+                            - m.ranks.index( "J"))*4 + m.suits.index( card.suit)]
     _screen.blit( sfc, (x+2, y +card_h -sfc.get_height()-2),
                         (0, 0, card_w-4, card_h-6))
+    #annotate card area
+    card.rect = Rectangle( x, y, x+card_w, y+card_h)
 
+def drawCardBack( card, x, y):
+    drawTopBevel( WHITE, x, y, card_w, cardtop_h, BRADIUS)
+    drawBottomBevel( WHITE, x, y+cardtop_h, card_w, card_h-cardtop_h, BRADIUS)
+    _screen.blit( backImage, (x+2, y+2), (0, 0, card_w-4, card_h-4))
+    #annotate card area
+    card.rect = Rectangle( x, y, x+card_w, y+card_h)
 
-def printCardBack( x, y):
-    drawTopBevel( WHITE, x, y, card_w, cardtop_h, 4)
-    drawBottomBevel( WHITE, x, y+cardtop_h, card_w, card_h-cardtop_h, 4)
-    _screen.blit( BackImage, (x+2, y+2), (0, 0, card_w-4, card_h-4))
+def drawTopCardBack( card, x, y):
+    drawTopBevel( WHITE, x, y, card_w, cardtop_h, BRADIUS)
+    _screen.blit( backImage, (x+2, y+2),(0, 0, card_w-4, backtop_h))
+    #annotate card area
+    card.rect = Rectangle( x, y, x+card_w, y+cardtop_h)
 
-
-def printTopCardBack( x, y):
-    drawTopBevel( WHITE, x, y, card_w, cardtop_h, 4)
-    _screen.blit( BackImage, (x+2, y+2),(0, 0, card_w-4, backtop_h))
-
+def drawPile( pile, x, y):
+    for card in pile.cards:
+        if ( card == pile.top()):
+            if card.face != 'U':    # ensure top cards are always face up
+                card.face = 'U'     # turn card up
+                log.append( ('turn', pile))
+            drawFullCard( card, x, y)
+        else: # visible
+            if card.face == 'D':
+                drawTopCardBack( card, x, y)
+            else:
+                drawTopCard( card, x, y)
+        y += cardtop_h
+        # count +=1
 
 def display( ):
-    # displays current game board
-    # creates a list of rects for touch and animate
-    global RectList, topXY, tipXY
+    'displays current game board'
+    global buttons
 
-    RectList = []
-    topXY = []
-    tipXY = []
-
-    # paint the background
+    # 0. paint the background
     _screen.fill( GREEN)
 
-    # 1. print the four tops
-    x = tops_left
-    for i in xrange( 4):
-        topXY.append( (x, tops_y))  # record coordinates
-        if getTop( i):
-            printFullCard( getTop( i), x, tops_y)
-            RectList.append( ( "top", i, ( x, tops_y, card_w, card_h)))
+    # 1. draw the four foundations
+    x = foundations_left
+    y = foundations_y
+    for foundation in m.foundations:
+        if foundation.cards:
+            drawFullCard( foundation.top(), x, y)
         else:
-            #place a hole
-            printEmptyCard( x,  tops_y)
+            # leave empty space
+            drawEmptyStack( foundation, x, y)
+        x += card_w + foundations_space
 
-        x += card_w +tops_space
-
-
-    # 2. print the stack and the basket
-    st = getStackTip()
-    if st:
-        printCardBack( stack_x, stack_y)
+    # 2. draw the deck and the waste
+    if m.deck.cards:
+        drawCardBack( m.deck.top(), deck_x, deck_y)
     else:
-        # leave a hole
-        printEmptyCard( stack_x, stack_y)
-    # always click-able
-    RectList.append( ( "stack", 0, ( stack_x, stack_y, card_w, card_h)))
+        # draw empty space
+        drawEmptyStack( m.deck, deck_x, deck_y)
 
-    # 3. print the basket
-    bt = getBasketTip()
-    if bt:
-        printFullCard( bt, basket_x , basket_y)
-        RectList.append( ( "basket", 0, ( basket_x, basket_y, card_w, card_h)))
+    # 3. draw the waste
+    if m.waste.cards:
+        drawFullCard( m.waste.top(), waste_x , waste_y)
     else:
-        # empty hole
-        printEmptyCard( basket_x, basket_y)
+        # draw empty space
+        drawEmptyStack( m.waste, waste_x, waste_y)
 
-    # 4. print the 7 rows
-    for i in xrange( 7):
-        x = rows_left + i * ( card_w +rows_space)
-        count = 0
+    # 4. draw the 7 piles
+    x = rows_left    
+    for pile in m.piles:
+        # count = 0
         y = rows_y
-        # in case row is empty
-        if not getTip( i):
-            printEmptyCard( x, y)
-            tipXY.append( (x, y))
+        if not pile.cards:      # in case pile is empty
+            drawEmptyStack( pile, x, y)
+        else: 
+            drawPile( pile, x, y)
+        x +=  card_w + rows_space
 
-        else: # print each card in the row
-            for card in rows[i]:
-                if hidden[i] > count:
-                    # show back of card
-                    #printTopCardBack( x, y)
-                    printCardBack( x, y)
-                    y += backtop_h
-                else: #visible
-                    if card == getTip( i):
-                        printFullCard( card, x, y)
-                        tipXY.append( ( x, y+cardtop_h))  # record tip coordinates
-                        RectList.append( ( "tip", i, ( x, y, card_w, card_h)))
-                    else:
-                        printTopCard( card, x, y)
-                        RectList.append( ( "tail", i*16+count, ( x, y, card_w, cardtop_h)))
-                    y += cardtop_h
-                count +=1
+    # 4.bis add card in animation
+    if animation.steps == animation.first:
+        # find the source and destination coordinates
+        dx, dy = animation.dest.coords()
+        if animation.dest.name == 'pile' and animation.dest.cards:
+            dy += cardtop_h
+        sx, sy = animation.sourceCoords()
+        # calculate the speed
+        animation.speed_x = (dx-sx) / (animation.first)
+        animation.speed_y = (dy-sy) / (animation.first)
+        animation.currentXY = ( sx, sy)
+    
+    if animation.steps > 0:   
+        # advance position
+        x, y = animation.currentXY
+        x += animation.speed_x
+        y += animation.speed_y
+        animation.currentXY = ( x, y)
+        for card in animation.cards[:-1]:           # draw first cards (partially covered)
+            drawTopCard( card, x, y)
+            y += cardtop_h
+        drawFullCard( animation.cards[-1], x, y)    # draw last card in full
+        animation.steps -= 1  
 
-    # status updates
-    x, y = XMax -120, basket_y + card_h + 20
-
-    # 5. add hidden counter
-    #text = "%d" % countHidden()
-    #img = _font.render( text, 1, WHITE)
-    #_screen.blit( img, (x, y))
-    #y+= 20
+    # 5. status updates
+    x, y = XMax -120, waste_y + card_h + 20
 
     # 6. add step counter
-    text = "Move: %d" % getCount()
+    text = "Move: %d" % m.getCount()
     img = _font.render( text, 1, WHITE)
     _screen.blit( img, (x, y))
     y += 20
 
     # 7. add buttons
-    for i in xrange( len(ButtonImages)):
-        _screen.blit( ButtonImages[ i], (x, y ))
-        RectList.append( ( "button", i, ( x, y, 100, 100)))
+    buttons = m.Stack('button', [], ( x, y))
+    for img in buttonImages:
+        _screen.blit( img, (x, y))
+        buttons.cards.append( Button( img, Rectangle( x, y, x+100, y+100)))
         y += 80
 
+def selectBox( optionsList):
+    ' model box selection menu'
+    options = []
+    for option in optionsList:
+        options.append( Button( _font.render( option, 1, WHITE), Rectangle(0,0,0,0)))
 
-def checkTouch( coord):
-    for r in RectList:
-        x, y, w, h = r[2]
-        if ((coord[0] > x) and (coord[0]<(x+w))):
-            if (( coord[1] > y) and ( coord[1]<(y+h))):
-                return (r[0], r[1], r[2][0:2])     # string, index, (x,y)
-    return None
-
-
-def selectBox( textStrings):
-    global RectList
-
-    lines = []
-    for text in textStrings:
-        lines.append( _font.render( text, 1, WHITE))
-
-    width = max( map( lambda(x): x.get_width(), lines))+2
-    height = max( map( lambda(x): x.get_height(), lines))+2
+    width = max( map( lambda(x): x.img.get_width(), options))+2
+    height = max( map( lambda(x): x.img.get_height(), options))+2
 
     # draw a (centered) box capable of containing all the strings
     x = (XMax - width -10)/2
-    y = (YMax - height* len(lines) - 10)/2
-    pygame.draw.rect( _screen, LIGHTGRAY, (x, y, width+10, height*len(lines)+10), 0)
+    y = (YMax - height* len( options) - 10)/2
+    pygame.draw.rect( _screen, LIGHTGRAY, (x, y, width+10, height*len( options)+10), 0)
 
     # draw each string in a box and record the rectangle
-    Reclist = []
     x += 5
     y += 5
-    for i, line in enumerate(lines):
+    for i, option in enumerate( options):
         # the first line of text is the title so it does not get a dark bkgnd
         if i>0:
             pygame.draw.rect( _screen, DARKGRAY, ( x, y, width, height), 0)
-            RectList.append( ("Box", i, (x, y, width, height)))
-        _screen.blit( line, (x+1, y+1))
+            option.rect = Rectangle(x, y, x+width, y+height)
+        _screen.blit( option.img, (x+1, y+1))
         y += height
 
-
-    # now wait for a choice from teh user (modal)
+    # now wait for user input (modal)
     while True:
         wait( 5)
         touch = None
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit()
-
             elif event.type == pygame.MOUSEBUTTONUP:
-                touch = checkTouch ( pygame.mouse.get_pos())
+                x, y = pygame.mouse.get_pos()
+                for index, option in enumerate( options):
+                    if option.rect.contains( x, y):
+                        return index-1   # ignore the title
 
-                if touch:
-                    return touch[1]-1   # ignore the title
+def wait( rate):
+    _clock.tick( rate)
+    pygame.display.flip()
 
-
-def loadCards():
-    global FigureImages, SeedImages, BackImage, ButtonImages
-
-    FigureImages = []
-    FigureImages.append( pygame.image.load("images/jh.png"))
-    FigureImages.append( pygame.image.load("images/jp.png"))
-    FigureImages.append( pygame.image.load("images/jd.png"))
-    FigureImages.append( pygame.image.load("images/jf.png"))
-    FigureImages.append( pygame.image.load("images/qh.png"))
-    FigureImages.append( pygame.image.load("images/qp.png"))
-    FigureImages.append( pygame.image.load("images/qd.png"))
-    FigureImages.append( pygame.image.load("images/qf.png"))
-    FigureImages.append( pygame.image.load("images/kh.png"))
-    FigureImages.append( pygame.image.load("images/kp.png"))
-    FigureImages.append( pygame.image.load("images/kd.png"))
-    FigureImages.append( pygame.image.load("images/kf.png"))
-    SeedImages = []
-    SeedImages.append( pygame.image.load("images/heart.png"))
-    SeedImages.append( pygame.image.load("images/pike.png"))
-    SeedImages.append( pygame.image.load("images/diamond.png"))
-    SeedImages.append( pygame.image.load("images/flower.png"))
-    SeedImages.append( pygame.image.load("images/bigheart.png"))
-    SeedImages.append( pygame.image.load("images/bigpike.png"))
-    SeedImages.append( pygame.image.load("images/bigdiamond.png"))
-    SeedImages.append( pygame.image.load("images/bigflower.png"))
-    BackImage = pygame.image.load( "images/RedBack.png")
-    ButtonImages = []
-    ButtonImages.append( pygame.image.load( "images/undo.png"))
-    ButtonImages.append( pygame.image.load( "images/restart.png"))
-    ButtonImages.append( pygame.image.load( "images/kill.png"))
-
-
-
-def init():
+def initView():
     global _clock, _screen, _font, XMax, YMax
-
+    global figureImages, suitsImages, bigSuitsImages, backImage, buttonImages
     pygame.init()
     pygame.display.set_caption( "PySolitaire")
     _clock = pygame.time.Clock()
     _font = pygame.font.Font( None, 32)
     _screen = pygame.display.set_mode( (XMax, YMax))
-    loadCards()
-
-
-def wait( rate):
-    _clock.tick( rate)
-    pygame.display.flip()
+    figureImages = []
+    figureImages.append( pygame.image.load("images/jh.png"))
+    figureImages.append( pygame.image.load("images/jp.png"))
+    figureImages.append( pygame.image.load("images/jd.png"))
+    figureImages.append( pygame.image.load("images/jf.png"))
+    figureImages.append( pygame.image.load("images/qh.png"))
+    figureImages.append( pygame.image.load("images/qp.png"))
+    figureImages.append( pygame.image.load("images/qd.png"))
+    figureImages.append( pygame.image.load("images/qf.png"))
+    figureImages.append( pygame.image.load("images/kh.png"))
+    figureImages.append( pygame.image.load("images/kp.png"))
+    figureImages.append( pygame.image.load("images/kd.png"))
+    figureImages.append( pygame.image.load("images/kf.png"))
+    suitsImages = []
+    suitsImages.append( pygame.image.load("images/hearts.png"))
+    suitsImages.append( pygame.image.load("images/spades.png"))
+    suitsImages.append( pygame.image.load("images/diamonds.png"))
+    suitsImages.append( pygame.image.load("images/clubs.png"))
+    bigSuitsImages = []
+    bigSuitsImages.append( pygame.image.load("images/bigheart.png"))
+    bigSuitsImages.append( pygame.image.load("images/bigspade.png"))
+    bigSuitsImages.append( pygame.image.load("images/bigdiamond.png"))
+    bigSuitsImages.append( pygame.image.load("images/bigclub.png"))
+    backImage = pygame.image.load( "images/RedBack.png")
+    buttonImages = []
+    buttonImages.append( pygame.image.load( "images/undo.png"))
+    buttonImages.append( pygame.image.load( "images/restart.png"))
+    buttonImages.append( pygame.image.load( "images/new.png"))
