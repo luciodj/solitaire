@@ -102,7 +102,7 @@ def touchPile( pile):
 
 class Animation( object):
     first = 5           # default number of steps
-    speed = 40          # defautl animation speed
+    speed = 30          # defautl animation speed
 
     def __init__( self):
         self.steps = 0          # animation steps counter
@@ -153,11 +153,11 @@ def drawTopCard( card, x, y):
     pygame.draw.line( _screen, LIGHTGRAY, ( x+4, y), ( x+card_w-4, y), 1)
     # rank
     value = card.rank if card.rank != "X" else "10"
-    img = _font.render( value, 1, (BLACK,RED)[ card.isRed()])
+    img = _font.render( value, True, (BLACK,RED)[ card.isRed()])
     _screen.blit( img, (x+pad, y+pad))
     # suit
     sfc = suitsImages[ m.suits.index( card.suit)]
-    _screen.blit( sfc, ( x+card_w-sfc.get_height()-pad, y+pad))
+    _screen.blit( sfc, ( x+card_w-sfc.get_width()-pad, y+pad+2))
     #annotate card area
     card.rect = Rectangle( x, y, x+card_w, y+cardtop_h)
 
@@ -170,25 +170,27 @@ def drawFullCard( card, x, y):
     if m.ranks.index( card.rank) <= m.ranks.index( "X"):
         # draw a big seed
         sfc = bigSuitsImages[ m.suits.index( card.suit)]
+        _screen.blit( sfc, (x+(card_w-sfc.get_width())/2 , y +card_h -sfc.get_height()-4),
+                            (0, 0, card_w-8, card_h-8))
     else:
        # draw the figure
         sfc = figureImages[ ( m.ranks.index( card.rank) 
                             - m.ranks.index( "J"))*4 + m.suits.index( card.suit)]
-    _screen.blit( sfc, (x+2, y +card_h -sfc.get_height()-2),
-                        (0, 0, card_w-4, card_h-6))
+        _screen.blit( sfc, (x+4, y +card_h -sfc.get_height()-4),
+                            (0, 0, card_w-8, card_h-8))
     #annotate card area
     card.rect = Rectangle( x, y, x+card_w, y+card_h)
 
 def drawCardBack( card, x, y):
     drawTopBevel( WHITE, x, y, card_w, cardtop_h, BRADIUS)
     drawBottomBevel( WHITE, x, y+cardtop_h, card_w, card_h-cardtop_h, BRADIUS)
-    _screen.blit( backImage, (x+2, y+2), (0, 0, card_w-4, card_h-4))
+    _screen.blit( backImage, (x+4, y+4), (0, 0, card_w-8, card_h-8))
     #annotate card area
     card.rect = Rectangle( x, y, x+card_w, y+card_h)
 
 def drawTopCardBack( card, x, y):
     drawTopBevel( WHITE, x, y, card_w, cardtop_h, BRADIUS)
-    _screen.blit( backImage, (x+2, y+2),(0, 0, card_w-4, backtop_h))
+    _screen.blit( backImage, (x+4, y+4),(0, 0, card_w-8, backtop_h))
     #annotate card area
     card.rect = Rectangle( x, y, x+card_w, y+cardtop_h)
 
@@ -338,7 +340,8 @@ def initView():
     pygame.init()
     pygame.display.set_caption( "PySolitaire")
     _clock = pygame.time.Clock()
-    _font = pygame.font.Font( None, 32)
+    _font = pygame.font.Font( pygame.font.match_font('Arial'), 24)
+    _font.set_bold( True)
     _screen = pygame.display.set_mode( (XMax, YMax))
     figureImages = []
     figureImages.append( pygame.image.load("images/jh.png"))
