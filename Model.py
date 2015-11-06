@@ -1,159 +1,175 @@
-#
-# Model
-#
+#!/usr/bin/env python
+'''
+    Model for game of solitaire
+'''
 import random
 
-ranks = 'A23456789XJQK' # internal representation of a card uses three chars: rank, suit, face
-suits = 'HSDC'          # define the four suits:  H = Hearts D = Diamonds S = Spades  C = Clubs
+RANKS = 'A23456789XJQK' # internal representation of a card uses three chars: rank, suit, face
+SUITS = 'HSDC'          # define the four suits:  H = Hearts D = Diamonds S = Spades  C = Clubs
 
-class Card( object):
-    def __init__( self, rank, suit):  #initialize with 2 integers
-        self.rank = ranks[ rank]
-        self.suit = suits[ suit]
+class Card(object):
+    'models a card'
+    def __init__(self, rank, suit):  #initialize with 2 integers
+        self.rank = RANKS[rank]
+        self.suit = SUITS[suit]
         self.face = 'U'     # face up by default
 
-    def __repr__( self):
+    def __repr__(self):
         return '%s, %s, %s' % (self.rank, self.suit, self.face)
 
-    def isRed( self):
-        return self.suit in 'HD'   # hearts and diamonds are red
+    def is_red(self):
+        'hearts and diamonds are red'
+        return self.suit in 'HD'
 
-    def precedes( self, card):    # check if self.precedes( card) in rank
-        return ranks.index( self.rank) == ( ranks.index( card.rank)-1)
+    def precedes(self, card):
+        'check if self.precedes(card) in rank'
+        return RANKS.index(self.rank) == (RANKS.index(card.rank)-1)
 
-    def matchFoundation( self):
+    def match_foundation(self):
         'find if the card is compatible with any of the foundations'
-        suit = suits.index( self.suit)
-        foundation = foundations[ suit]
-        if foundation.takesCard( self):
+        suit = SUITS.index(self.suit)
+        foundation = FOUNDATIONS[suit]
+        if foundation.takes_card(self):
             return foundation
         else:
             return None   # no match
 
-    def matchPile( self):
+    def match_pile(self):
         'find if the card on deck is compatible with any of the piles'
-        for pile in piles:
-            if pile.takesCard( self):  
+        for pile in PILES:
+            if pile.takes_card(self):
                 return pile
         return None   # no match
 
 
-class Stack( object):
-    def __init__(self, name, cards, xy):
+class Stack(object):
+    'models a stack of cards'
+    def __init__(self, name):
         self.name = name
-        self.cards = cards
-        self.xy = xy
+        self.cards = []
+        self.xy = (0, 0)
 
-    def top( self):
+    def top(self):
+        'return top of stack'
         return self.cards[-1]
 
-    def coords( self):
-        if not self.cards:      # if stack is empty 
-            return ( self.xy)
+    def coords(self):
+        'return coordinates of stack of cards'
+        if not self.cards:      # if stack is empty
+            return self.xy
         else:
-            return (self.cards[-1].rect.x, self.cards[-1].rect.y)   
+            return (self.cards[-1].rect[0], self.cards[-1].rect[1])
 
-    def takesCard( self, card):
+    def set_coords(self, coords):
+        'assign new coordinates to stack'
+        self.xy = coords
+        
+    def takes_card(self, card):
         'check if card/tail compatible with destination stack'
         if self.name == 'pile':
-            if not(self.cards):                 # empty pile
-                return ( card.rank == 'K')      # can only take Kings
-            else:                               # non empty 
+            if not self.cards:                  # empty pile
+                return card.rank == 'K'         # can only take Kings
+            else:                               # non empty
                 top = self.top()
                 # ensure that the seed is alternate RED/Black
-                if top.isRed() == card.isRed(): 
+                if top.is_red() == card.is_red():
                     return False
                 # and the card is sequential
-                return  card.precedes( top)
+                return  card.precedes(top)
         else:    # foundation
-            if not( self.cards):                # empty foundation 
-                return( card.rank == 'A')       # can only take Aces
-            else:                               # non empty 
+            if not self.cards:                  # empty foundation
+                return card.rank == 'A'         # can only take Aces
+            else:                               # non empty
                 top = self.cards[-1]
-                return top.precedes( card)
+                return top.precedes(card)
 
 savedDeck = []
 countSteps = 0
+DECK = []
+WASTE = []
+FOUNDATIONS = []
+PILES = []
 
-# init the deck
 def init():
-    global deck, waste, foundations, piles
+    'define the deck as a list of cards'
+    global DECK, WASTE, FOUNDATIONS, PILES
+    DECK = Stack('deck')
+    WASTE = Stack('waste')
+    # foundations = map(lambda x: Stack('foundation', [], (0, 0)), xrange(4))
+    FOUNDATIONS = [Stack('foundation')  for x in range(4)]
+    # piles = map(lambda x: Stack('pile', [], (0, 0)), xrange(7))    # all piles are empty lists
+    PILES = [Stack('pile') for x in range(7)]
+    for rank in xrange(13):
+        for suit in xrange(4):
+            DECK.cards.append(Card(rank=rank, suit=suit))
 
-    deck = Stack( 'deck', [], (0,0))
-    waste = Stack( 'waste', [], (0,0))
-    foundations = map( lambda x: Stack('foundation', [], (0,0)), xrange( 4))
-    piles = map( lambda x: Stack('pile', [], (0,0)), xrange( 7))    # all piles are empty lists
-
-    # define the deck as a list of cards
-    for n in xrange( 13):
-      for s in xrange( 4):
-        deck.cards.append( Card( rank = n, suit = s))
-
-def shuffle( ):
+def shuffle():
+    'shuffle deck to deal a new game'
     global savedDeck
-    # shuffle
-    random.shuffle( deck.cards)
-    savedDeck = deck.cards[:]   # make a copy for later use in restart
+    random.shuffle(DECK.cards)
+    savedDeck = DECK.cards[:]   # make a copy for later use in restart
 
 # deal cards
 def deal():
-    # distribute in a diagonal pattern 1, 2, 3, 4, 5, 6, 7
-    for h in xrange( 6):
-        for i in xrange( 6-h):
-            card = deck.cards.pop()
-            card.face = 'D'      
-            piles[ 6-i].cards.append( card)
-        card = deck.cards.pop()
+    'distribute in a diagonal pattern 1, 2, 3, 4, 5, 6, 7'
+    for pile in xrange(6):
+        for length in xrange(6-pile):
+            card = DECK.cards.pop()
+            card.face = 'D'
+            PILES[6-length].cards.append(card)
+        card = DECK.cards.pop()
         card.face = 'U'
-        piles[h].cards.append( card)
-    card = deck.cards.pop()
+        PILES[pile].cards.append(card)
+    card = DECK.cards.pop()
     card.face = 'U'
-    piles[6].cards.append( card)
+    PILES[6].cards.append(card)
 
 def restart():
-    global deck
+    'restart game'
     init()
-    deck.cards = savedDeck[:]
+    DECK.cards = savedDeck[:]
     deal()
 
-def countHidden():
+def count_hidden():
     'count all the hidden cards left'
     count = 0
-    for pile in piles:
+    for pile in PILES:
         for card in pile.cards:
             if card.face == 'D':
-                count += 1 
+                count += 1
     # including those in the waste
-    if waste:
-        return count + len( deck.cards) + len( waste.cards) -1
+    if WASTE:
+        return count + len(DECK.cards) + len(WASTE.cards) -1
     else:
-        return count + len( deck.cards)
+        return count + len(DECK.cards)
 
-def checkFinished():
+def check_finished():
     'verify that all piles are empty'
-    for pile in piles:
+    for pile in PILES:
         if pile.cards:
             return False
     # verify that deck and waste are empty too
-    return not( deck.cards or waste.cards)
+    return not(DECK.cards or WASTE.cards)
 
-# recycle the deck from the waste
 def recycle():
-    if waste.cards:
-        deck.cards = waste.cards[:]
-        deck.cards.reverse()
-        waste.cards = []
+    'recycle the deck from the waste'
+    if WASTE.cards:
+        DECK.cards = WASTE.cards[:]
+        DECK.cards.reverse()
+        WASTE.cards = []
 
-# undo recycle 
-def undoRecycle():
-    waste.cards = deck.cards[:]
-    waste.cards.reverse()
-    deck.cards = []
-    
-def getCardsFrom( source, index):
+def undo_recycle():
+    'undo recycle'
+    WASTE.cards = DECK.cards[:]
+    WASTE.cards.reverse()
+    DECK.cards = []
+
+def get_cards_from(source, index):
+    'remove cards from a pile'
     tail = source.cards[index:]
     del source.cards[index:]
-    return tail    
+    return tail
 
-def getCount():
+def get_count():
+    'pass the current value of the step counter'
     return countSteps
