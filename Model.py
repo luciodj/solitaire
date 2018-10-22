@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 '''
     Model for game of solitaire
 '''
@@ -95,12 +94,12 @@ def init():
     global DECK, WASTE, FOUNDATIONS, PILES
     DECK = Stack('deck')
     WASTE = Stack('waste')
-    # foundations = map(lambda x: Stack('foundation', [], (0, 0)), xrange(4))
+    # foundations = map(lambda x: Stack('foundation', [], (0, 0)), range(4))
     FOUNDATIONS = [Stack('foundation')  for x in range(4)]
-    # piles = map(lambda x: Stack('pile', [], (0, 0)), xrange(7))    # all piles are empty lists
+    # piles = map(lambda x: Stack('pile', [], (0, 0)), range(7))    # all piles are empty lists
     PILES = [Stack('pile') for x in range(7)]
-    for rank in xrange(13):
-        for suit in xrange(4):
+    for rank in range(13):
+        for suit in range(4):
             DECK.cards.append(Card(rank=rank, suit=suit))
 
 def shuffle():
@@ -112,8 +111,8 @@ def shuffle():
 # deal cards
 def deal():
     'distribute in a diagonal pattern 1, 2, 3, 4, 5, 6, 7'
-    for pile in xrange(6):
-        for length in xrange(6-pile):
+    for pile in range(6):
+        for length in range(6-pile):
             card = DECK.cards.pop()
             card.face = 'D'
             PILES[6-length].cards.append(card)

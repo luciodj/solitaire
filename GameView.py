@@ -1,6 +1,5 @@
-#!/usr/bin/env python
 '''
-    Solitaire Game View
+    view for Solitaire 
 '''
 import pygame
 import sys
@@ -26,7 +25,7 @@ BACKTOP_H = 35
 
 XMAX, YMAX = 9*CARD_W, CARD_H*2 + BACKTOP_H*6 + CARDTOP_H*12
 FOUNDATIONS_SPACE = 20
-FOUNDATIONS_LEFT = (XMAX-(4*CARD_W)-(4*FOUNDATIONS_SPACE))/2
+FOUNDATIONS_LEFT = (XMAX-(4*CARD_W)-(4*FOUNDATIONS_SPACE))//2
 FOUNDATIONS_Y = 10
 ROWS_SPACE = 5
 ROWS_LEFT = 10
@@ -109,9 +108,10 @@ def touch_pile(pile):
 class Animation(object):
     'support for animation sequences'
     first = 5           # default number of steps
-    speed = 30          # defautl animation speed
+    speed = 20          # defautl animation speed
 
     def __init__(self):
+        self.speed = Animation.speed
         self.steps = 0          # animation steps counter
         self.dest = []          # target list for card(s) at the end of animation
         self.cards = []         # list of card(s) 'in motion'
@@ -149,17 +149,19 @@ def draw_top_bevel(_color, coords, width, height):
     'drop a top rounded rectangle'
     left, top = coords
     right = left + width
-    pygame.draw.circle(screen, _color, (left+BRADIUS, top+BRADIUS), BRADIUS, 0)
-    pygame.draw.circle(screen, _color, (right-BRADIUS, top+BRADIUS), BRADIUS, 0)
+    pygame.draw.circle(screen, _color, (int(left+BRADIUS), int(top+BRADIUS)), int(BRADIUS), 0)
+    pygame.draw.circle(screen, _color, (int(right-BRADIUS), int(top+BRADIUS)), int(BRADIUS), 0)
     pygame.draw.rect(screen, _color, (left, top+BRADIUS, width, height), 0)
     pygame.draw.rect(screen, _color, (left+BRADIUS, top, width-BRADIUS-BRADIUS, BRADIUS), 0)
 
 def draw_bottom_bevel(_color, coords, width, height):
     'draw a bottom rounded rectangle'
     left, top = coords
+    left = int(left)
+    top = int(top)
     right = left + width
     bottom = top + height
-    pygame.draw.circle(screen, _color, (left+BRADIUS, bottom-BRADIUS), BRADIUS, 0)
+    pygame.draw.circle(screen, _color, (int(left+BRADIUS), int(bottom-BRADIUS)), BRADIUS, 0)
     pygame.draw.circle(screen, _color, (right-BRADIUS, bottom-BRADIUS), BRADIUS, 0)
     pygame.draw.rect(screen, _color, (left, top, width, height-BRADIUS), 0)
     pygame.draw.rect(screen, _color, (left+BRADIUS, top+height-BRADIUS,
@@ -237,7 +239,7 @@ def draw_pile(pile, coords):
 
 buttons = m.Stack('button')
 
-def display():
+def draw():
     'displays current game board'
     # 0. paint the background
     screen.fill(GREEN)
@@ -291,6 +293,7 @@ def display():
 
     if animation.steps > 0:
         # advance position
+        # print('animation step', animation.steps)
         curx, cury = animation.current_xy
         curx += animation.speed_x
         cury += animation.speed_y
@@ -316,6 +319,8 @@ def display():
         screen.blit(img, (left, top))
         buttons.cards.append(Button(img, Rectangle(left, top, left+100, top+100)))
         top += 80
+
+    pygame.display.flip()
 
 def select_box(options_list):
     ' model box selection menu'
@@ -346,7 +351,7 @@ def select_box(options_list):
 
     # now wait for user input (modal)
     while True:
-        wait(5)
+        wait(20)
         # touch = None
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -359,8 +364,8 @@ def select_box(options_list):
 
 def wait(rate):
     'establish animation rate'
+    # pygame.display.flip()
     clock.tick(rate)
-    pygame.display.flip()
 
 
 figureImages = []
@@ -373,29 +378,29 @@ pygame.display.set_caption("PySolitaire")
 screen = pygame.display.set_mode((XMAX, YMAX))
 clock = pygame.time.Clock()
 _font = pygame.font.Font(pygame.font.match_font('Arial'), 24)
-_font.set_bold(True)
+_font.set_bold(False)
 
 def init_view():
     'load images'
-    figureImages.append(pygame.image.load("images/jh.png"))
-    figureImages.append(pygame.image.load("images/jp.png"))
-    figureImages.append(pygame.image.load("images/jd.png"))
-    figureImages.append(pygame.image.load("images/jf.png"))
+    figureImages.append(pygame.image.load("images/jh.png")) 
+    figureImages.append(pygame.image.load("images/jp.png")) 
+    figureImages.append(pygame.image.load("images/jd.png")) #
+    figureImages.append(pygame.image.load("images/jf.png")) # 
     figureImages.append(pygame.image.load("images/qh.png"))
     figureImages.append(pygame.image.load("images/qp.png"))
-    figureImages.append(pygame.image.load("images/qd.png"))
-    figureImages.append(pygame.image.load("images/qf.png"))
+    figureImages.append(pygame.image.load("images/qd.png")) 
+    figureImages.append(pygame.image.load("images/qf.png")) 
     figureImages.append(pygame.image.load("images/kh.png"))
     figureImages.append(pygame.image.load("images/kp.png"))
     figureImages.append(pygame.image.load("images/kd.png"))
-    figureImages.append(pygame.image.load("images/kf.png"))
+    figureImages.append(pygame.image.load("images/kf.png")) #
     suitsImages.append(pygame.image.load("images/hearts.png"))
-    suitsImages.append(pygame.image.load("images/sPADes.png"))
+    suitsImages.append(pygame.image.load("images/spades.png")) #
     suitsImages.append(pygame.image.load("images/diamonds.png"))
-    suitsImages.append(pygame.image.load("images/clubs.png"))
+    suitsImages.append(pygame.image.load("images/clubs.png")) #
     bigSuitsImages.append(pygame.image.load("images/bigheart.png"))
-    bigSuitsImages.append(pygame.image.load("images/bigsPADe.png"))
-    bigSuitsImages.append(pygame.image.load("images/bigdiamond.png"))
+    bigSuitsImages.append(pygame.image.load("images/bigspade.png"))
+    bigSuitsImages.append(pygame.image.load("images/bigdiamond.png")) #
     bigSuitsImages.append(pygame.image.load("images/bigclub.png"))
     backImage.append(pygame.image.load("images/RedBack.png"))
     buttonImages.append(pygame.image.load("images/undo.png"))
