@@ -107,7 +107,7 @@ def touch_pile(pile):
 
 class Animation(object):
     'support for animation sequences'
-    first = 5           # default number of steps
+    first = 8           # default number of steps
     speed = 20          # defautl animation speed
 
     def __init__(self):

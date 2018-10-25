@@ -7,7 +7,6 @@ from GameView import touch_deck, touch_waste, touch_button, touch_pile, select_b
 import Model as model
 import pygame
 import sys
-import time
 
 #
 # Controller
@@ -28,6 +27,7 @@ def move(dest, source, index):
     for card in animation.cards:
         animation.dest.cards.append(card)
     draw()
+    print(model.get_state())
     model.countSteps += 1
 
 def check_move_to_pile(atouch):
@@ -62,9 +62,10 @@ def undo():
             card = params.top()
             undo()                          # move / animate
             card.face = 'D'                 # turn back down
-            display()
         elif action == "recycle":
             model.undo_recycle()
+        draw()
+        print(model.get_state())
 
 def user_input():
     'returns a touch tuple, intercepts QUIT'
@@ -82,16 +83,20 @@ def user_input():
                 return touch_deck()
             if event.key == pygame.K_COMMA:
                 return touch_button(0)
-    return []
 
 def start_game():
-    'set up the intial gaame configuration'
+    'set up the intial game configuration'
     model.init()
-    model.shuffle()
-    model.deal()
+    # check if a configuration restore is required for debugging
+    if len(sys.argv) > 1:
+        model.restore_state(sys.argv[1])
+        del(sys.argv[1])
+    else:
+        model.shuffle()
+        model.deal()
     model.countSteps = 0
     log.clear()
-    draw()
+
 
 #----------------------------------------------------------------------
 
@@ -100,9 +105,13 @@ if __name__ == "__main__":
     auto = False
     victory = False
     start_game()
-
+    draw()
+    # print state for debugging purposes
+    print(model.get_state())
+    
     # main loop
     while True:
+
         wait(animation.speed)
         touch = user_input()
 
@@ -112,6 +121,7 @@ if __name__ == "__main__":
                 auto = False
                 victory = False
                 start_game()
+                continue
             else:
                 sys.exit()
 
@@ -140,6 +150,7 @@ if __name__ == "__main__":
                 else: # if deck is empty
                     model.recycle()
                     draw()
+                    print(model.get_state())
                     log.append(("recycle", 0))
 
             elif touch.source.name == "pile":
@@ -169,8 +180,10 @@ if __name__ == "__main__":
                     auto = False
                     victory = False
                     start_game()
+                draw()
+                # print state for debugging purposes
+                print(model.get_state())
 
-            # draw()
             # check if auto can be activated
             if not auto:
                 auto = (model.count_hidden() < 1)

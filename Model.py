@@ -8,13 +8,13 @@ SUITS = 'HSDC'          # define the four suits:  H = Hearts D = Diamonds S = Sp
 
 class Card(object):
     'models a card'
-    def __init__(self, rank, suit):  #initialize with 2 integers
-        self.rank = RANKS[rank]
-        self.suit = SUITS[suit]
-        self.face = 'U'     # face up by default
+    def __init__(self, rank_suit):  #initialize with a string
+        self.rank = rank_suit[0]
+        self.suit = rank_suit[1]
+        self.face = rank_suit[2]     
 
     def __repr__(self):
-        return '%s, %s, %s' % (self.rank, self.suit, self.face)
+        return '"%s%s%s"' % (self.rank, self.suit, self.face)
 
     def is_red(self):
         'hearts and diamonds are red'
@@ -100,7 +100,7 @@ def init():
     PILES = [Stack('pile') for x in range(7)]
     for rank in range(13):
         for suit in range(4):
-            DECK.cards.append(Card(rank=rank, suit=suit))
+            DECK.cards.append(Card(RANKS[rank]+SUITS[suit]+'U'))
 
 def shuffle():
     'shuffle deck to deal a new game'
@@ -172,3 +172,26 @@ def get_cards_from(source, index):
 def get_count():
     'pass the current value of the step counter'
     return countSteps
+
+def get_state():
+    'returns the game state as a string of the tuple: (DECK, WASTE, FOUNDATIONS, PILES)'
+    return "'" + str((DECK.cards, WASTE.cards, [x.cards for x in FOUNDATIONS], [x.cards for x in PILES]))+"'"
+
+def restore_state(str):
+    'restores state form a string containing the tuple (DECK, WASTE, FOUNDATIONS, PILES)'
+    print('Restoring state:')
+    deck, waste,  foundations, piles = eval(str)
+    #restore the deck
+    DECK.cards = []
+    for card in deck: DECK.cards.append(Card(card))
+    WASTE.cards = []
+    for card in waste: WASTE.cards.append(Card(card))
+    for i,f in enumerate(FOUNDATIONS):
+        f.cards = []
+        for card in foundations[i]:
+            f.cards.append(Card(card))
+    for i,p in enumerate(PILES):
+        p.cards = []
+        for card in piles[i]:
+            p.cards.append(Card(card))
+
