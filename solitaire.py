@@ -44,6 +44,8 @@ def check_move_to_foundation(atouch):
     'verify if a card is compatible with a foundation'
     if not atouch:
         return None
+    if len(atouch.source.cards[touch.index:]) > 1:
+        return None
     card = atouch.source.cards[touch.index]
     foundation = card.match_foundation()
     if foundation != None:
